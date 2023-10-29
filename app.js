@@ -18,9 +18,6 @@ app.get("/", (req, res) => {
   res.send("<h1>Bienvenid@ al servidor</h1>");
 });
 
-// app.get("/people", (req, res) => {
-//   res.json(people); // Enviamos todo el array
-// });
 
 // Utilizacion de la base de datos desde nodeJS
 
@@ -42,35 +39,18 @@ app.get("/people", async (req, res) => {
   }
 });
 
-app.get("/people/:index", (req, res) => {
-  /*La propiedad "params" del request permite acceder a los parámetros de la URL 
-    (importante no confundir con la "query", que serían los parámetros que se colocan 
-    luego del signo "?" en la URL)
-   */
-  res.json(people[req.params.index]); // Enviamos el elemento solicitado por su índice
-});
+// Realizamos un GET segun la id del elemento
 
-// app.post("/people", (req, res) => {
-//   /* La propiedad "body" del request permite acceder a los datos 
-//        que se encuentran en el cuerpo de la petición */
-
-//   people.push(req.body); // Añadimos un nuevo elemento al array
-
-//   res.json(req.body); // Le respondemos al cliente el objeto añadido
-// });
-
-// Intento realizar la funcion post con nodeJS
-
-app.post("/people", async (req, res) => {
+app.get("/people/:id", async (req, res) => {
   let conn;
   try {
 
   // Realiza el select de la database
   conn = await pool.getConnection();
-  const rows = await conn.query("SELECT name, lastname, email FROM people");
+  const rows = await conn.query("SELECT name, lastname, email FROM people WHERE id=?",[req.params.id]);
 
   // Linea que contesta al cliente
-  res.json(rows);
+  res.json(rows[0]);
 
   }catch(error){
     res.status(500).json({message:"Se rompió el servidor"});
@@ -80,24 +60,75 @@ app.post("/people", async (req, res) => {
 });
 
 
-app.put("/people/:index", (req, res) => {
-  /* COMPLETA EL CÓDIGO NECESARIO:
-     Para que se pueda actualizar el objeto asociado al índice indicado en la URL 
-   */
-  
-  people.splice(req.params.index, 1, req.body); // Reemplazamos un elemento del array por uno que introduzca el cliente
+// Realizamos la funcion POST con nodeJS
 
-  res.json(req.body); // Le respondemos al cliente el nuevo objeto
+app.post("/people", async (req, res) => {
+  let conn;
+  try {
+
+  // Insertamos un elemento con nombre, apellido y email especificados en el body
+
+  conn = await pool.getConnection();
+  const response = await conn.query(`INSERT INTO people (name, lastname, email)
+  VALUES (?, ?, ?)`, [req.body.name, req.body.lastname, req.body.email]);
+
+  // Linea que contesta al cliente
+  res.json({ id: response.insertID, ...req.body});
+
+  }catch(error){
+    console.log(error);
+    res.status(500).json({message:"Se rompió el servidor"});
+  } finally {
+  if (conn) conn.release(); //release to pool
+  }
 });
 
-app.delete("/people/:index", (req, res) => {
-  /* COMPLETA EL CÓDIGO NECESARIO:
-     Para que se pueda eliminar el objeto asociado al índice indicado en la URL 
-   */
+// Realizamos la funcion PUT con nodeJS (segun su ID)
 
-  res.json(people[req.params.index]); // Le respondemos al cliente el elemento que se va a eliminar
+app.put("/people/:id", async (req, res) => {
+  let conn;
+  try {
 
-  people.splice(req.params.index, 1); // Eliminamos el elemento del array
+  // Actualizamos el elemento cuya id se especifica en la URL
+
+  conn = await pool.getConnection();
+  const response = await conn.query(`UPDATE people SET name=?, lastname=?, email=?
+  WHERE id=?`, [req.body.name, req.body.lastname, req.body.email, req.params.id]);
+
+  // Linea que contesta al cliente
+  res.json({ id: response.insertID, ...req.body});
+
+  }catch(error){
+    console.log(error);
+    res.status(500).json({message:"Se rompió el servidor"});
+  } finally {
+  if (conn) conn.release(); //release to pool
+  }
+});
+
+// Realizamos la funcion DELETE con nodeJS (segun su ID)
+
+app.delete("/people/:id", async(req, res) => {
+  let conn;
+  try {
+
+  conn = await pool.getConnection();
+
+  // Realizamos un SELECT para devolver el elemento que se va a eliminar
+
+  const rows = await conn.query("SELECT name, lastname, email FROM people WHERE id=?",[req.params.id]);
+
+  // Linea que contesta al cliente
+  res.json(rows[0]);
+
+  const response = await conn.query(`DELETE FROM people WHERE id=?`, [req.params.id]);
+
+  }catch(error){
+    console.log(error);
+    res.status(500).json({message:"Se rompió el servidor"});
+  } finally {
+  if (conn) conn.release(); //release to pool
+  }
 });
 
 // Esta línea inicia el servidor para que escuche peticiones en el puerto indicado
